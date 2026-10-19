@@ -2,6 +2,8 @@
 
 **多个 AI 同时写一个项目，还不打架。**
 
+> 镜像：[GitHub](https://github.com/kuoleroy/parallel-agents) · [Gitee](https://gitee.com/kuoleroy/parallel-agents)
+
 > 一套与工具无关的并行 AI 开发方法：主控定契约、排波次、管合并；执行 AI 各占一个 git worktree 与独占文件边界并行推进。
 >
 > **EN** — An agent-agnostic playbook for running multiple AI coding agents on one project concurrently: freeze the contract first, schedule by dependency waves, isolate each agent in its own git worktree, and merge only through a gate. Works with Claude Code, Cursor, Trae, Codex, OpenCode, Antigravity — anything that can read files and run git.
@@ -102,8 +104,10 @@ git worktree add ../wk-taskA -b feature/taskA main
 ## 快速开始
 
 ```bash
-# 1. 拿到 skill
+# 1. 拿到 skill（国内可用 Gitee 镜像）
 git clone https://github.com/kuoleroy/parallel-agents.git
+# 或
+git clone https://gitee.com/kuoleroy/parallel-agents.git
 
 # 2. 在你的项目里建契约目录，照 templates/contract.md 写契约
 mkdir -p docs/contracts
