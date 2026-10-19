@@ -1,0 +1,31 @@
+# 依赖
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 构建产物
+dist/
+build/
+out/
+.next/
+target/
+
+# 环境
+.env
+.env.local
+*.local
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# 验证残留
+*.verify.*
+*.tmp
+
+# worktree（脚本默认建在仓库同级目录，这里兜底）
+wk-*/
