@@ -103,7 +103,7 @@ git worktree add ../wk-taskA -b feature/taskA main
 
 ```bash
 # 1. 拿到 skill
-git clone https://github.com/<you>/parallel-agents.git
+git clone https://github.com/kuoleroy/parallel-agents.git
 
 # 2. 在你的项目里建契约目录，照 templates/contract.md 写契约
 mkdir -p docs/contracts
