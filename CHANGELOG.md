@@ -18,6 +18,7 @@
 
 - 文档与实录同步到真实数字：`README.md` / `README.zh.md` / `SKILL.md` / `docs/methodology.md` / `docs/evidence.md`。`docs/evidence.md` 新增「这套测试自己放过的两个 bug（由 CI 抓到）」一节与实录四。
 - `p_matches` 里 `[[ "$f" == $p ]]` 补上 `SC2053` 抑制注释：右边加引号会让通配匹配退化成字面量比较，这里要的就是通配，shellcheck 只是不知道意图。
+- **shellcheck job 摘掉 `continue-on-error`，从「只报告」变成硬门禁**。它第一次跑绿就是在同一轮 CI 里报出了上面那条静默失效的冻结判定 bug——这条 job 不是装饰。
 - **教训进了方法论文档**：机制测试只在一种环境跑过就等于没跑过。CI 覆盖 ubuntu + windows 两个 runner 不是仪式感，它这轮就是唯一抓到这两个 bug 的东西。
 
 ## 0.2.0 — 2026-10-22
@@ -60,7 +61,7 @@
 
 ### Known limits of this release
 
-- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。
+- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。（已在 Unreleased 里做到：它报出的两条之一就是真 bug，跑绿后已摘掉 `continue-on-error`。）
 - `v0.2.0` tag 指向加徽章之前的提交；徽章 job 的那次 CI 运行不在 tag 上，属预期。
 
 ## 0.1.0 — 初始版本
