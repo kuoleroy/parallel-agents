@@ -1,0 +1,40 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  mechanism:
+    name: 机制测试 (bash + git + node)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 语法检查
+        shell: bash
+        run: |
+          for f in scripts/*.sh tests/run-test.sh; do
+            echo "bash -n $f"
+            bash -n "$f"
+          done
+
+      - name: 跑机制测试
+        shell: bash
+        run: bash tests/run-test.sh
+
+  lint:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck -S warning
+        run: shellcheck -S warning -x scripts/*.sh tests/run-test.sh

@@ -49,7 +49,7 @@
 - **S0 定契约**（或派架构角色定，自己拍板）。
 - **排波次**、写任务书、登记「分支 ↔ worktree ↔ 独占文件」归属表。
 - **冻结共享文件**，统一预装依赖。
-- **收口**：体检 → `merge --no-ff` → 构建/实测 → 回归 → 清理。
+- **收口**：对每个分支跑**合并前闸门**（边界 → 构建 → 实测 → 回归），全绿才 `merge --no-ff`，最后清理。
 - 等待交付时就真的等，不插手执行 AI 的工作区。
 
 ### 架构角色（L2+，只在 S0）
@@ -88,7 +88,7 @@
 
 - **主控**：可以是一个人，也可以是一个专门的主控 AI 窗口。
 - **执行 AI**：**一个任务 = 一个窗口 = 一个分支 = 一个 worktree**，逐一对应，不混岗。
-- 所有分支从同一个 `main` 起，最终都并回 `main`，**只有主控动 `main`**。
+- 所有分支从同一个 `main` 起，最终都并回 `main`，**只有主控动 `main`**。仓库用 `master` 也一样，下文命令里的 `<base>` 指主干分支；脚本会自动探测 `main`/`master`。
 
 ---
 
@@ -124,23 +124,32 @@ idx_items_created_at (created_at desc)
 type Item = { id: string; title: string; createdAt: string }
 ```
 
-**改契约的规矩**：只有主控能改；改了必须广播 + 所有在跑的分支 `git merge main` 对齐。改契约不是禁忌，但要留痕、要同步。
+**改契约的规矩**：只有主控能改；改了必须广播 + 所有在跑的分支 `git merge <base>` 对齐（base 是 `main` 或 `master`，脚本会自动探测，也可用 `BASE_BRANCH` 指定）。改契约不是禁忌，但要留痕、要同步。
 
 ### S1 · 拆解与任务书
 
 - 把需求拆到「文件不重叠 + 可独立验收」。
 - 按依赖排波次（见 §4）。
-- 每任务写一份任务书（见 §7）。
-- 登记归属表：
+- 每任务用 `scripts/new-task.sh` 建分支 + worktree + 任务书，并**自动登记归属表**：
 
-```markdown
-| 任务 | 分支 | worktree | 独占文件 | 波次 |
-|------|------|----------|----------|------|
-| 01 数据层 | feature/data | ../wk-data | src/db/**, migrations/** | 1 |
-| 02 搜索接口 | feature/search | ../wk-search | src/api/search.ts | 2 |
-```
+  ```bash
+  scripts/new-task.sh 01 data src/db migrations
+  ```
 
-- 列**共享文件冻结清单**：锁文件、共享类型、骨架数据、主文档、compose。
+  归属表落在 `docs/tasks/ownership.md`，是**机器可读**的（`gate.sh` 靠它拦越界）：
+
+  ```markdown
+  | 任务 | 分支 | worktree | 波次 | 端口 | 独占文件 | 状态 |
+  |---|---|---|---|---|---|---|
+  | 01 data | feature/data | ../wk-data | 1 | 3101 | src/db migrations | active |
+  | 02 search | feature/search | ../wk-search | 2 | 3102 | src/api/search.ts | active |
+  ```
+
+  列顺序不能改；状态取 `active / merged / abandoned`。波次需要人工补，其余由脚本填。
+  端口按 `BASE_PORT + 任务号` 分配，冲突自动顺延——闸门要起服务，必须一人一口。
+
+- **建任务即校验边界**：清单与在跑任务重叠、或命中冻结文件，`new-task.sh` 直接拒绝开工并打印冲突对。边界不是约定，是硬拦。
+- 冻结清单落在 `docs/tasks/frozen.patterns`（一行一个通配），首次运行自动生成，按项目改它并 commit。
 - 每个 worktree **预装依赖**。
 
 ### S2 · 并行执行
@@ -151,7 +160,7 @@ type Item = { id: string; title: string; createdAt: string }
 
 ### S3 · 收口与验收
 
-按 §8 合并闸门执行。合并完成后，让其余 worktree `git merge main` 快进对齐，**再开下一波**。
+按 §8 合并闸门执行。合并完成后，让其余 worktree `git merge <base>` 快进对齐，**再开下一波**。
 
 ### S4 · 回流（红了怎么办）
 
@@ -189,23 +198,25 @@ type Item = { id: string; title: string; createdAt: string }
 **波次规划要点**：
 - 波次 1 尽量塞满（这是唯一能真正全速跑的窗口，因为没有任何上游等待）。
 - 单波内任务数 ≤ 5（超过主控合并不过来）。
-- 每波结束：合并 → 其余 worktree 对齐 main → 再开下一波。**不要在波次中途合并**。
+- 每波结束：合并 → 其余 worktree 对齐主干 → 再开下一波。**不要在波次中途合并**。
 
 ---
 
-## 5. 铁律（八条）
+## 5. 铁律（九条）
 
 1. **一个任务 = 一个分支 = 一个 worktree = 一条独占文件边界**
    用 `git worktree` 共享同一个 `.git`，不必复制仓库；每棵工作树独立装依赖。
 
    ```bash
-   git worktree add ../wk-taskA -b feature/taskA main
+   git worktree add ../wk-taskA -b feature/taskA <base>
    git worktree list
    ```
 
+   实际用 `scripts/new-task.sh` 建，它会顺手校验边界、分配端口、登记归属表。
+
 2. **契约先行**：接口、数据模型、共享类型冻结在 `docs/contracts/`，改只能主控改且必须广播。**没有契约不开分支。**
 
-3. **冻结共享文件**：锁文件（`pnpm-lock.yaml` 等）、共享类型、骨架数据、主文档、compose，任何分支不许改，只由主控统一维护。锁文件**只能由 install 自动生成**，绝不手改。
+3. **冻结共享文件**：锁文件（`pnpm-lock.yaml` 等）、共享类型、迁移、主文档、compose，任何分支不许改，只由主控统一维护。清单落在 `docs/tasks/frozen.patterns`，`new-task.sh`（建任务时）和 `gate.sh`（收口时）都会读它。锁文件**只能由 install 自动生成**，绝不手改。
 
 4. **依赖由主控预装**：执行 AI 不许 `pnpm install` / `pip install` / 起 docker / 监听端口。避免并发抢端口、避免依赖漂移。
 
@@ -215,7 +226,9 @@ type Item = { id: string; title: string; createdAt: string }
 
 7. **按波次放行**：波内并行、波间串行。不要一次把所有任务开出去。
 
-8. **合并闸门**：体检 → `--no-ff` 合并 → 构建 + 接口实测 → 全绿才算完（见 §8）。
+8. **合并闸门在合并之前**：边界 → 构建 → 起服务实测 → 回归，全绿才 `git merge --no-ff`（见 §8）。**`SKIP` 不等于通过**——`REQUIRE_FULL=1` 下任何跳过都算红。
+
+9. **没进归属表不许合并**：`docs/tasks/ownership.md` 里查不到分支，闸门直接拒。
 
 ---
 
@@ -232,9 +245,13 @@ type Item = { id: string; title: string; createdAt: string }
 - [ ] 环境变量样例（.env.example）
 ```
 
+前 6 项是人工核对；真正的强制力在 `docs/tasks/frozen.patterns`——一行一个通配，脚本逐文件比对。人工清单负责「别忘」，模式文件负责「拦下」。
+
 ---
 
 ## 7. 任务书模板（固定七段）
+
+`scripts/new-task.sh` 生成的骨架就是下面这个形状——分支、worktree、契约 sha、独占文件、端口、「不要动」清单都自动填好，人只补目标、前置、步骤、验收标准。
 
 ```markdown
 # 任务书 NN · <任务名>
@@ -243,16 +260,17 @@ type Item = { id: string; title: string; createdAt: string }
 - worktree：<绝对路径>
 - 波次：<1 / 2 / 3>
 - 前置：<依赖哪些任务/契约，或"无硬依赖">
-- 上游契约：docs/contracts/<file>.md @ <commit sha>
+- 上游契约：docs/contracts/ @ <commit sha>
+- 分配端口：<本任务专用端口，起服务只用它>
 
 ## 目标
 一句话说清"做完之后能多什么能力"。
 
 ## 独占文件
-- <只列本任务可改的文件/目录，尽量收窄>
+- <只列本任务可改的文件/目录，尽量收窄；脚本据此拦越界>
 
 ## 不要动
-- <列出别人或共享的东西，包括锁文件、共享类型、骨架、主文档、compose>
+- <冻结文件（脚本自动生成）+ 其他任务的 worktree 与独占文件>
 
 ## 步骤
 > 环境：依赖已由主控预装；不要自己起服务、不要抢端口。
@@ -289,34 +307,40 @@ type Item = { id: string; title: string; createdAt: string }
 
 ## 8. 合并闸门（主控收口）
 
-对每个完工分支，按顺序做，**任一步红就退回**：
+**闸门跑在合并之前**，对象是这个分支自己的 worktree。理由很直接：合并完再发现问题，脏的是主干；合并前发现，脏的只是那条分支。
 
-1. **体检**：分支提交是否都在授权范围内、工作区是否干净、有无越界改动、有无验证残留文件（`*.verify.*`、临时 `Dockerfile`）。
-2. **合并**：`git merge --no-ff <branch>`（保留合并点，便于回溯）；冲突一律**主控亲自解**，不退回给执行 AI。
-3. **构建/配置校验**：`docker compose config`、前端 `build`、后端启动。
-4. **接口/页面实测**：`curl` 真实端点，跑关键路径；边界用例（非法参数、后端宕机降级、404）要覆盖。
-5. **回归**：确认「既有行为零改动」。
-6. **安全检查**（L3 必做，L2 抽查）：密钥硬编码、未校验的用户输入、越权访问、SQL 拼接、日志泄露 PII。
-7. **清理**：删掉验证残留文件后再进 `main`。
+对每个完工分支按顺序做，**任一步红就退回，不往下跑**：
 
-> 合并到 `main` 后，让其余 worktree `git merge main` 快进对齐，避免长期分叉。
+| # | 步骤 | 谁做 | 红意味着什么 |
+|---|---|---|---|
+| 1 | 前置：基线分支探测 + 分支必须在归属表里登记 | 自动 | 没走流程的分支，直接拒 |
+| 2 | 体检：worktree 是否还有未提交改动、有无验证残留（`*.verify.*`、临时 `Dockerfile`） | 自动 | 交付物不完整 / 有垃圾 |
+| 3 | **边界**：每个改动文件必须落在自己的独占清单内，不得命中冻结文件，不得踩到别的在跑任务 | 自动 | 方法的核心承诺，越界即退回 |
+| 4 | 任务书「不要动」复核 | 自动 | 显式保护区被改了 |
+| 5 | 构建：`BUILD_CMD`（compose config、前端 build 等） | 自动 | 编译不过 |
+| 6 | 接口实测：闸门自己用**分配端口**起服务 → 探健康端点 → 跑边界用例（非法参数必须 4xx）→ 收掉 | 自动 | 契约写了但没实现 |
+| 7 | 回归：`TEST_CMD` + 改动文件清单（既有代码是"改"还是"新增"） | 自动 | 既有行为被动到 |
+| 8 | 安全检查（密钥硬编码、未校验输入、越权、SQL 拼接、日志泄露 PII）、清理残留 | **人工** | 脚本不代答 |
+| 9 | `git merge --no-ff <branch>`；冲突**主控亲自解**，不退回给执行 AI | 人工 | — |
 
-**建议固化成脚本**（`scripts/gate.sh`），主控一条命令跑完 1/3/4/5：
+第 6 步解决了方法里的一处矛盾：执行 AI 不许起服务、不许抢端口，但接口实测又需要一个在跑的服务。答案是——由闸门在**该任务专属端口**上起、探完立刻收，执行 AI 全程不动服务。
+
+`scripts/gate.sh` 覆盖 1~7：
 
 ```bash
-#!/usr/bin/env bash
-set -e
-BRANCH=$1
-git diff --stat main..."$BRANCH" || true
-test -z "$(git status --porcelain)" || { echo "工作区不干净"; exit 1; }
-docker compose config >/dev/null
-pnpm -w build
-curl -fsS localhost:3000/api/health >/dev/null
-curl -fsS "localhost:3000/api/items?page=abc" -o /dev/null -w '%{http_code}\n' | grep -q 400
-echo "GATE OK"
+BUILD_CMD='pnpm -w build' \
+TEST_CMD='pnpm -w test' \
+SERVE_CMD='node server.mjs' \
+  scripts/gate.sh feature/search
 ```
 
-把闸门自动化，是第二个「花时间省时间」的投入——手点 checklist 每次 15 分钟，脚本 40 秒。
+输出是一行一结果的计数报告，结尾 `OK / SKIP / FAIL` 三个数。**没配的步骤报 `SKIP`，不会假装通过**；CI 里加 `REQUIRE_FULL=1`，任何 `SKIP` 直接算红——配置不全的闸门比没有闸门更危险，因为它看着像绿了。
+
+跑完 `bash tests/run-test.sh` 可以复现这套拦截（零成本，纯 bash/git/node，不消耗任何 token）；实测结果与真实输出实录在 [evidence.md](evidence.md)。
+
+> 合并到主干后，让其余 worktree `git merge <base>` 快进对齐，避免长期分叉。
+
+把闸门自动化，是第二个「花时间省时间」的投入——手点 checklist 每次 15 分钟，脚本 40 秒；而且脚本不会因为「看起来对」就放行。
 
 ---
 
@@ -329,7 +353,7 @@ echo "GATE OK"
 - [ ] `curl -s localhost:3000/api/items?q=abc` 返回 200，且 `jq '.total'` 为数字
 - [ ] `curl -s "localhost:3000/api/items?page=abc"` 返回 400，body 含 `INVALID_QUERY`
 - [ ] 关掉上游服务后，同端点返回 503，body 含 `UPSTREAM_DOWN`（降级不崩）
-- [ ] `git diff main -- src/db/` 为空（既有数据层零改动）
+- [ ] `git diff <base> -- src/db/` 为空（既有数据层零改动）
 ```
 
 坏的验收标准（**不要写**）：
@@ -355,6 +379,8 @@ echo "GATE OK"
 - ❌ **任务之间文件重叠还硬并行**。
 - ❌ **在原分支上打补丁修验收失败** → 开新分支。
 - ❌ **为了「流程完整」上 14 个角色** → 每个交接都在丢上下文，速度崩。
+- ❌ **边界只写在文档里，不落到脚本** → 文档管不住手，越界要等到合并时才发现。
+- ❌ **把 `SKIP` 当通过** → 配置不全的闸门会一路放行到合并，比没闸门更危险。
 
 ---
 
@@ -379,15 +405,17 @@ echo "GATE OK"
 
 **S0 契约（主控 / 架构）**
 - [ ] 项目知识文档就绪：方向、架构、已知坑
-- [ ] `docs/contracts/` 三件套已冻结并 commit 到 main
-- [ ] 共享文件冻结清单已确认
+- [ ] `docs/contracts/` 三件套已冻结并 commit 到主干
+- [ ] 共享文件冻结清单已确认（并同步进 `docs/tasks/frozen.patterns`）
 
 **S1 拆解（主控）**
 - [ ] 任务已拆到「文件不重叠、可独立验收」
 - [ ] 依赖按「产出是否进入输入」判定，波次已排好
-- [ ] 归属表（分支/worktree/独占文件/波次）已登记
+- [ ] `docs/tasks/frozen.patterns` 已按项目调整并 commit
+- [ ] 每个任务用 `scripts/new-task.sh` 建：分支 + worktree + 任务书 + 归属表登记 + 端口分配
+- [ ] 归属表的波次列已补齐
 - [ ] 每个 worktree 依赖已预装
-- [ ] 闸门脚本可用
+- [ ] `gate.sh` 的 `BUILD_CMD` / `TEST_CMD` / `SERVE_CMD` 已配好（配不了就 `REQUIRE_FULL=1`，别当绿）
 
 **S2 执行（每个执行 AI）**
 - [ ] 先读项目文档 + 契约（含 sha）+ 本任务任务书
@@ -395,13 +423,33 @@ echo "GATE OK"
 - [ ] 自测通过后，产出交付契约
 
 **S3 收口（主控 / 验收）**
-- [ ] 体检 → merge → 构建 → 实测 → 回归 → 安全 → 清理残留
-- [ ] 更新文档与归属表；其余 worktree 对齐 main
+- [ ] 合并前跑闸门：前置 → 体检 → 边界 → 保护区 → 构建 → 实测 → 回归
+- [ ] 人工补安全与清理，然后才 `git merge --no-ff`
+- [ ] 更新文档与归属表（状态改 `merged`）；其余 worktree 对齐主干
 - [ ] 红了按 §3-S4 回流，不在旧分支打补丁
 
 ---
 
-## 13. 一句话记住
+## 13. 机器层（本仓库提供的部分）
+
+方法论里能被机器执行的部分，都固化成了脚本。这是它和「一篇讲并行开发的文章」的区别。
+
+| 文件 | 作用 |
+|---|---|
+| `scripts/new-task.sh` | 一条命令建分支 + worktree + 任务书 + 归属表登记 + 端口分配；**边界重叠或命中冻结文件直接拒绝开工** |
+| `scripts/gate.sh` | 合并前闸门，自动跑 §8 的 1~7 步，任一步红即非零退出 |
+| `scripts/parallel-lib.sh` | 两个脚本共用的边界语义（归属表解析、通配匹配、重叠判定、基线探测） |
+| `docs/tasks/ownership.md` | 归属表，`任务 \| 分支 \| worktree \| 波次 \| 端口 \| 独占文件 \| 状态`，脚本读写 |
+| `docs/tasks/frozen.patterns` | 冻结文件通配清单，一行一个 |
+| `docs/evidence.md` | 实测拦截记录与真实输出 |
+| `tests/run-test.sh` | 零 token 端到端复现：往流程里注入 8 种违规，逐条断言被拦下 |
+| `AGENTS.md` | 给只认规则文件、不装 skill 的 agent 的精简可执行版 |
+
+诚实的边界：这套脚本验证的是**机制**（违规会被拦下），不是**效果**（多 agent 并行真的更快）。后者要在真实项目上跑对照实验，本仓库没有那个数据，也不假装有过。
+
+---
+
+## 14. 一句话记住
 
 > **边界清晰、契约先行、波次编排、合并设闸。**
 > 凡是能被分成「互不碰文件」的活，就并行；分不干净，就别硬并行。

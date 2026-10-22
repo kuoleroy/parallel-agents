@@ -1,199 +1,158 @@
 # parallel-agents
 
-**多个 AI 同时写一个项目，还不打架。**
+**Multiple AI agents writing one project at the same time — without stepping on each other.**
 
-> 镜像：[GitHub](https://github.com/kuoleroy/parallel-agents) · [Gitee](https://gitee.com/kuoleroy/parallel-agents)
+> 中文：[README.zh.md](README.zh.md) · 简体中文说明
 
-> 一套与工具无关的并行 AI 开发方法：主控定契约、排波次、管合并；执行 AI 各占一个 git worktree 与独占文件边界并行推进。
->
-> **EN** — An agent-agnostic playbook for running multiple AI coding agents on one project concurrently: freeze the contract first, schedule by dependency waves, isolate each agent in its own git worktree, and merge only through a gate. Works with Claude Code, Cursor, Trae, Codex, OpenCode, Antigravity — anything that can read files and run git.
+<p>
+  <a href="docs/evidence.md"><strong>Verified: 8 violations injected, 8 blocked · compliant branch OK 11 / SKIP 0 / FAIL 0</strong></a>
+</p>
+
+An agent-agnostic playbook for running several AI coding agents on one project at once: freeze the contract first, schedule by dependency waves, isolate each agent in its own git worktree with a machine-checked file boundary, and merge only through a gate. Follows the [Agent Skills](https://agentskills.io) open standard — no platform feature, no MCP server, no slash command required.
 
 ---
 
-## 问题
+## What you expect vs what happens
 
-你有 3 个 AI 窗口，想同时推进一个项目。实际发生的是：
+You have 3 AI windows and one project. Here is the actual outcome:
 
-| 你以为 | 实际 |
+| You expect | You get |
 |---|---|
-| 三倍速度 | 主控在解冲突，变成人肉串行器 |
-| 各写各的 | 两个 agent 改了同一个文件 |
-| 前后端并行 | 前端写 `userId`，后端写 `user_id`，联调才发现 |
-| 都装依赖 | 抢端口、依赖漂移、锁文件互相覆盖 |
-| 都说"做完了" | 没人能跑出一条验证命令 |
+| 3× the speed | The orchestrator resolves conflicts all day and becomes a human serialiser |
+| Everyone writes their own files | Two agents edit the same file, one silently overwrites the other |
+| Frontend and backend in parallel | Frontend writes `userId`, backend writes `user_id`, discovered at integration |
+| Everyone installs deps | Port contention, dependency drift, lockfiles clobbering each other |
+| Everyone says "done" | Nobody can produce a single command that proves it |
 
-**并行开发不是"多开几个窗口"，是一套边界与契约工程。**
+**Parallel development is not "open more windows". It is boundary and contract engineering.**
 
----
+## The mechanism, verified
 
-## 四个核心机制
-
-### 1. 契约先行 — 消除最大一类返工
-
-开分支前冻结三样，落 `docs/contracts/`：
-
-- **接口契约**：端点、方法、请求/响应 schema、错误码
-- **数据模型**：表 / 字段名 / 类型 / 可空性 / 索引
-- **共享类型**：前端 TS 类型、后端 DTO
-
-并行开发的返工，绝大多数来自「两个 agent 对同一个字段名理解不同」。契约冻结把这类返工从**合并时发现**提前到**开工前消除**。
-
-> 这是全文唯一一个「花时间反而省时间」的环节。
-
-### 2. 波次编排 — 真正的提速点
-
-按依赖分波，波内并行、波间串行：
+[`tests/run-test.sh`](tests/run-test.sh) builds a throwaway repo, creates real tasks in real worktrees, then injects the exact mistakes this method claims to prevent. No AI, no network, no token spend — a few seconds on your machine.
 
 ```
-波次 1（无依赖，全并行）  数据模型 / 路由骨架 / 设计令牌 / 部署编排
-波次 2（依赖波 1 契约）   后端接口 / 前端页面 / 数据导入
-波次 3（依赖波 2）        集成联调 / 端到端验收
+8 violations injected → 8 blocked; 9 positive assertions passed.
 ```
 
-依赖判定标准只有一条：**A 的产出是否出现在 B 的输入里**（接口形状、字段名、类型定义）。
-
-只是「逻辑上相关」不算依赖。这条能砍掉大量假依赖——很多人把相关的都串起来，白白浪费并行窗口。
-
-### 3. 文件边界 — 合并零冲突
-
-一个任务 = 一个分支 = 一个 worktree = 一条独占文件清单。
-
-```bash
-git worktree add ../wk-taskA -b feature/taskA main
-```
-
-共享文件（锁文件、共享类型、迁移目录、主文档、compose）**冻结**，只由主控维护。
-
-### 4. 合并闸门 — 红了就不算完成
-
-体检 → `merge --no-ff` → 构建 → 接口实测 → 回归 → 清理。任一步红就退回。
-
-验收标准必须能跑出结果：
+The most useful one is not a merge conflict. The contract says invalid pagination must return `400`; the agent wrote code that silently falls back to page 1. Boundaries are clean, the build is clean, git reports nothing:
 
 ```
-✅  curl -s "localhost:3000/api/items?page=abc" | jq -r .code   →  "INVALID_QUERY"
-❌  功能正常
+-- boundary check (nothing changed outside the exclusive list)
+  OK    no out-of-bounds · no intrusion · no frozen files touched
+-- build
+  OK    build passed
+-- live HTTP probe
+  OK    server started (pid 2228, port 28263)
+  OK    health http://127.0.0.1:28263/api/health
+  FAIL  boundary case expected 4xx, got 200
 ```
 
-`scripts/gate.sh` 把这一串固化成一条命令。
+The gate's own words for that last line are `FAIL 边界用例期望 4xx，实际 200` — verdict strings are currently Chinese-only, see [Limits](#limits-stated-plainly).
 
----
+And when a task edits inside another live task's boundary, it names the owner:
 
-## 为什么不直接上 14 个 agent
+```
+      src/api/search.js (belongs to 02 search @ feature/search)
+  FAIL  intruded on a live task's boundary; the two would overwrite each other
+```
 
-有个流行的做法是搞一套完整 SDLC 编制：PM / PO / 研究 / 分析 / 架构 / 设计 / 前端 / 后端 / DevOps / 文档 / 测试 / 安全 / 批判 / 合并，14 个角色全程在线。
+Read the full transcript and its limits in [docs/evidence.md](docs/evidence.md).
 
-听起来很完整，实际会**变慢**：
+## The four mechanisms
 
-- 每个角色交接点都在丢上下文，13 次交接 = 13 次信息衰减
-- 串行阶段排满，并行窗口被切成碎片
-- 角色越多，主控的调度成本越高
+**1. Contract first.** Before any branch opens, freeze three artifacts into `docs/contracts/` and commit the sha: interfaces (endpoints, schemas, error codes), data model (tables, fields, types, nullability), shared types (frontend types and backend DTOs in one file). After that, branches may not touch them — only the orchestrator can, and every change is broadcast and followed by `git merge <base>` in every live worktree. Most rework in parallel development is two agents disagreeing about one field name; freezing moves that discovery from merge time to before start.
 
-`parallel-agents` 的取舍是：**角色按项目规模伸缩**。
+**2. Dependency waves.** Run each wave in parallel, the waves in sequence:
 
-| 档位 | 编制 | 适用 |
+```
+Wave 1 (no deps, full parallel)   data model / route skeleton / design tokens / deploy
+Wave 2 (needs wave 1 contract)    backend API / frontend pages / data import
+Wave 3 (needs wave 2)             integration / end-to-end verification
+```
+
+One test decides dependency: **does A's output appear in B's input** — an interface shape, a field name, a type definition. If no, they belong in the same wave. "Related" is not a dependency, and treating it as one is how people throw away their parallel windows.
+
+**3. Machine-checked file boundary.** One task = one branch = one worktree = one exclusive file list, registered in `docs/tasks/ownership.md`. `new-task.sh` refuses to create a task whose list overlaps a live task or names a frozen file, and allocates one port per task so executors cannot collide. `gate.sh` then checks every changed file against that row.
+
+**4. The merge gate.** `gate.sh <branch>` runs pre-merge and stops at the first red: preflight → uncommitted/ residue → boundary → do-not-touch → build → live HTTP probe → tests. Acceptance criteria must be a command and an expected output:
+
+```
+✅  curl -s "localhost:3102/api/items?page=abc" → 400 {"code":"INVALID_QUERY"}
+❌  works fine
+```
+
+## Why not just staff 14 agents
+
+A popular setup runs a full SDLC org chart: PM / PO / researcher / analyst / architect / designer / frontend / backend / DevOps / writer / tester / critic / security / merge, all online the whole time.
+
+It is complete, and it is slower. Every role boundary is a handoff, and every handoff loses context; the serial phases carve the parallel window into confetti; and the orchestrator's scheduling cost grows with the roster.
+
+`parallel-agents` sizes the roster to the project instead:
+
+| Tier | Staffing | Use when |
 |---|---|---|
-| **L1** 默认 | 主控 + 执行 ×2~3 | 功能模块、页面、数据层 |
-| **L2** | + 架构（只在契约阶段）+ 验收（只在收口阶段） | 新项目从 0 起、跨端 |
-| **L3** | + 安全审查 + 文档 | 对外发布、涉钱涉权限 |
+| **L1** default | orchestrator + 2–3 executors | feature modules, pages, data layer |
+| **L2** | + architect (contract phase only) + verifier (merge phase only) | new project from zero, cross-platform |
+| **L3** | + security reviewer + tech writer | public release, money or permissions involved |
 
-关键设计：**架构和验收都只出现一次就退场**，不参与日常。加角色是成本，不是能力。
+The architect and the verifier appear once and leave. **Adding roles is a cost, not a capability.**
 
----
-
-## 快速开始
+## Quick start
 
 ```bash
-# 1. 拿到 skill（国内可用 Gitee 镜像）
 git clone https://github.com/kuoleroy/parallel-agents.git
-# 或
-git clone https://gitee.com/kuoleroy/parallel-agents.git
+# 国内镜像: git clone https://gitee.com/kuoleroy/parallel-agents.git
 
-# 2. 在你的项目里建契约目录，照 templates/contract.md 写契约
-mkdir -p docs/contracts
-# → 写完 commit 到 main，之后任何分支不得改
+# 1. freeze the contract in your project
+mkdir -p docs/contracts        # copy templates/contract.md, fill it, commit to your base branch
 
-# 3. 建任务：worktree + 分支 + 任务书
-./parallel-agents/scripts/new-task.sh 01 data src/db/** migrations/**
+# 2. create tasks (worktree + branch + task book + ownership row + allocated port)
+./parallel-agents/scripts/new-task.sh 01 data src/db migrations
+./parallel-agents/scripts/new-task.sh 02 search src/api/search.ts
 
-# 4. 把任务书贴给一个执行 AI 窗口
+# 3. pre-install deps as the orchestrator, then hand each task book to its own agent window
 
-# 5. 收口
-./parallel-agents/scripts/gate.sh feature/data
+# 4. gate every branch before it lands
+./parallel-agents/scripts/gate.sh feature/search
 ```
 
----
+Configure the gate for your stack with env vars — `BUILD_CMD`, `TEST_CMD`, `SERVE_CMD`, `BASE_BRANCH`, `BASE_PORT`, `REQUIRE_FULL`. Unset steps report `SKIP`, never a pass.
 
-## 安装为 Skill
+## Install as a skill
 
-**WorkBuddy / Claude Code（用户级）**
+The repo root **is** the skill folder, so it installs anywhere the Agent Skills format is read. `SKILL.md` name matches the folder name, as the spec requires.
 
-```bash
-cp -r parallel-agents ~/.workbuddy-ai/skills/parallel-agents
-# 或 Claude Code: ~/.claude/skills/parallel-agents
-```
-
-**项目级（团队共享，跟着仓库走）**
-
-```bash
-mkdir -p .agent/skills && cp -r parallel-agents .agent/skills/
-```
-
-**或者什么都不装** —— 直接把 `docs/methodology.md` 丢给 AI 读，它一样能照做。
-
-这是刻意的设计：**不依赖任何平台特性、不需要 MCP server、不需要斜杠命令**。
-
----
-
-## 目录结构
-
-```
-parallel-agents/
-├── SKILL.md                      # 可安装的 skill（触发后按此执行）
-├── docs/
-│   └── methodology.md            # 完整方法论长文
-├── templates/
-│   ├── contract.md               # 契约模板
-│   └── task-book.example.md      # 任务书示例（已填好）
-├── scripts/
-│   ├── new-task.sh               # 建 worktree + 生成任务书
-│   └── gate.sh                   # 合并闸门
-└── LICENSE
-```
-
----
-
-## 真提速 vs 假提速
-
-| 看起来提速 | 实际 |
+| Agent | Path |
 |---|---|
-| 多加几个执行窗口 | ❌ 超过 5~6 个，主控合并成本吃掉全部收益 |
-| 跳过契约直接开写 | ❌ 返工成本 = 省下时间的 3~5 倍 |
-| 一次全开，看起来最并行 | ❌ 冲突排队，实际比串行还慢 |
-| 让 AI 自己装依赖 | ❌ 抢端口 / 依赖漂移，调试时间远超装依赖时间 |
-| **先定契约再开分支** | ✅ 消除最大一类返工 |
-| **正确分波次，波 1 塞满** | ✅ 唯一能全速跑的窗口不浪费 |
-| **依赖主控预装** | ✅ 每个 agent 省 2~3 分钟，且不冲突 |
-| **任务书自包含 + 带契约 sha** | ✅ agent 不用探索代码库、不用提问 |
-| **闸门脚本化** | ✅ 每次收口 15 分钟 → 40 秒 |
+| Claude Code | `cp -r parallel-agents ~/.claude/skills/parallel-agents` (project: `.claude/skills/`) |
+| Cursor | `.cursor/skills/parallel-agents` or `.agents/skills/parallel-agents` |
+| Codex / Gemini CLI / Copilot / others | copy into that agent's skills directory |
+| Rule-file-only agents | copy [`AGENTS.md`](AGENTS.md) into your project |
+| Nothing to install | hand [`docs/methodology.md`](docs/methodology.md) to an agent and it can follow it |
 
----
+Deliberately: **no platform feature, no MCP server, no slash command.** Claude Code / Codex plugin manifests are not included yet because the author has not verified them on a real install; a tested PR is welcome.
 
-## 适用 / 不适用
+## When this is the wrong tool
 
-**适用**：项目级建设，能拆成若干**文件不重叠、可独立验收**的模块。
+- Small changes — one bug, one function: stay single-window.
+- Fewer than 3 tasks: coordination costs more than it returns.
+- Tasks that share many files: redraw the boundaries first.
+- Requirements still moving: write the contract first, or don't parallelise yet.
 
-**不适用**：
+Two questions decide it: **can the file lists be disjoint, and are there at least 3 tasks?**
 
-- 小改动（一个 bug、一个函数）—— 直接单窗口
-- 任务数 < 3 —— 协调开销吃掉收益
-- 任务之间共享大量文件 —— 先重构边界
-- 需求还没定清楚 —— 先写文档再开分支
+## Limits, stated plainly
 
-判断口诀：**文件清单能不能互不相交？任务数够不够 3 个？**
+- The test suite verifies the **mechanism**, not the outcome of a real multi-agent project. There is no measured "rework dropped from X to Y" figure here, and this README does not claim one.
+- Boundary-overlap detection is heuristic: exact paths, bare directories, `dir/**`, `dir/*` and single-level `*.ts` are understood; negation and brace expansion are not. Keep lists narrow.
+- Scripts are bash (Git Bash on Windows). No PowerShell port exists.
+- Verdict strings printed by `new-task.sh` / `gate.sh` and the generated task books are Chinese-only. Docs are bilingual; localising the tool output means touching the task-book parser in `gate.sh` and every template at once, so it is deliberately not half-done.
+- The gate probes HTTP endpoints, so a stack without an HTTP layer configures `BUILD_CMD` / `TEST_CMD` and reads the probe `SKIP` honestly.
 
----
+## Security note
+
+Install only from `kuoleroy/parallel-agents` on GitHub or `kuoleroy/parallel-agents` on Gitee. This repo ships markdown and shell scripts only — never a binary. The scripts do not call the network, and `tests/` binds ports only under your own machine's temp directory.
 
 ## License
 
-MIT
+MIT.
