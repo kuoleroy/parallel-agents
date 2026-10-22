@@ -128,7 +128,7 @@ Automated:
 3. **Boundary** — every changed file falls inside its exclusive list, outside the frozen list, and outside every other live task's boundary.
 4. **Protection** — nothing touched from the task book's do-not-touch section.
 5. **Build** — `BUILD_CMD` in the worktree.
-6. **Probe** — starts `SERVE_CMD` on the task's allocated port if nothing is listening, then `curl`s the health endpoint and a boundary case that must return 4xx.
+6. **Probe** — starts `SERVE_CMD` on the task's allocated port, then `curl`s the health endpoint and a boundary case that must return 4xx, then stops the server and waits for the port to free. A port already occupied by something the gate did not start is a `FAIL`, not a shortcut: the gate cannot prove that process runs this branch. Point `HEALTH_URL` at an external service if you want to test one deliberately.
 7. **Regress** — `TEST_CMD`, plus a report of which changed files already existed on the base.
 
 Manual, never answered by the gate:
@@ -178,7 +178,7 @@ After merging, have every remaining worktree run `git merge <base>` to realign b
 
 ## Verified behavior
 
-`docs/evidence.md` records the mechanism test: 8 injected violations, 8 blocked, and a compliant branch passing `OK 11 · SKIP 0 · FAIL 0` with a real HTTP probe. Reproduce with `bash tests/run-test.sh` — no AI, no network, no token spend. It verifies the gate's mechanism, not the outcome of a real multi-agent project.
+`docs/evidence.md` records the mechanism test: 9 injected violations, 9 blocked, and a compliant branch passing `OK 12 · SKIP 0 · FAIL 0` with a real HTTP probe. Reproduce with `bash tests/run-test.sh` — no AI, no network, no token spend. It verifies the gate's mechanism, not the outcome of a real multi-agent project.
 
 ## Reference files
 

@@ -11,7 +11,7 @@
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-lightgrey" alt="Agent Skills standard"></a>
 </p>
 
-**[已验证：注入 8 次违规 → 拦下 8 次 · 合规分支 `OK 11 · SKIP 0 · FAIL 0`](docs/evidence.md)**
+**[已验证：注入 9 次违规 → 拦下 9 次 · 合规分支 `OK 12 · SKIP 0 · FAIL 0`](docs/evidence.md)**
 
 > 一套与工具无关的并行 AI 开发方法：主控定契约、排波次、管合并；执行 AI 各占一个 git worktree 与一条**机器校验**的独占文件边界并行推进。遵循 [Agent Skills](https://agentskills.io) 开放规范——不依赖任何平台特性、不需要 MCP server、不需要斜杠命令。
 
@@ -36,7 +36,7 @@
 [`tests/run-test.sh`](tests/run-test.sh) 会自建一个一次性仓库，用真脚本建真任务、开真 worktree，然后**故意注入这套方法声称能拦住的那些错误**：
 
 ```
-违规注入 8 次 → 拦下 8 次；正向断言 10 项。
+违规注入 9 次 → 拦下 9 次；正向断言 10 项。
 ```
 
 **不调用任何 AI，不联网，不花 token**，本机几秒跑完。
@@ -51,10 +51,19 @@
   OK    构建通过
 
 -- 接口实测
-  OK    服务已启动 (pid 2228, port 28263)
-  OK    健康检查 http://127.0.0.1:28263/api/health
+  OK    服务已启动 (pid 1557, port 21234)
+  OK    健康检查 http://127.0.0.1:21234/api/health
   FAIL  边界用例期望 4xx，实际 200
 ```
+
+实测还不肯借用别人起着的服务。端口上已经站着东西，闸门无法确认那个进程跑的是**本分支**代码，于是直接停：
+
+```
+-- 接口实测
+  FAIL  端口 21234 上已有服务，闸门无法确认它跑的是本分支代码
+```
+
+这条不是纸上规则，它替换的是一个真 bug：闸门曾经悄悄测了上一轮遗留的服务，把"通过"发给了错误的构建。两个缺陷都是 CI 在 Linux runner 上抓出来的——同一条测试在作者自己的 Windows 机器上已经绿了好几周。
 
 越界改动会被点名到归属者：
 

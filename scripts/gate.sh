@@ -11,8 +11,10 @@
 #   EXCLUSIVE     手工给独占清单     默认从 docs/tasks/ownership.md 按分支查
 #   BUILD_CMD     构建命令          默认空=跳过并如实标 SKIP
 #   TEST_CMD      测试命令          默认空=跳过并如实标 SKIP
-#   SERVE_CMD     启动服务命令      空且服务没在跑时，接口实测跳过
-#                 （设了它，闸门会在该任务 worktree 里带 PORT=<分配端口> 起服务，探完自动收）
+#   SERVE_CMD     启动服务命令      闸门在该任务 worktree 里带 PORT=<分配端口> 起服务，
+#                 探完立刻收掉。端口若已被别的服务占着，闸门判失败而不是借用它——
+#                 借来的服务跑的不是本分支代码，实测结论就是假的。
+#   HEALTH_URL    显式指定实测对象   设了它就不自己起服务（闸门会 WARN：无法确认来源）
 #   HEALTH_PATH   健康端点          默认 /api/health
 #   BAD_CASE_PATH 边界用例(应 4xx)   默认 /api/items?page=abc
 #   WAIT_SECS     等服务就绪上限     默认 20
@@ -53,11 +55,24 @@ N_OK=0; N_FAIL=0; N_SKIP=0
 SERVE_PID=""
 SERVE_LOG=""
 
-cleanup() {
-  if [ -n "$SERVE_PID" ] && kill -0 "$SERVE_PID" >/dev/null 2>&1; then
-    kill "$SERVE_PID" >/dev/null 2>&1 || true
-    wait "$SERVE_PID" >/dev/null 2>&1 || true
+# 停掉闸门自己起的测试服务，并确认端口真的放开了——
+# 下一轮实测必须面对一个干净的端口，否则会拿旧进程的结果当本分支的结论。
+stop_serve() {
+  [ -n "$SERVE_PID" ] || return 0
+  kill "$SERVE_PID" >/dev/null 2>&1 || true
+  wait "$SERVE_PID" >/dev/null 2>&1 || true
+  if [ -n "${SERVE_PROBE_URL:-}" ]; then
+    local _i
+    for _i in $(seq 1 40); do
+      reachable "$SERVE_PROBE_URL" || break
+      sleep 0.25
+    done
   fi
+  SERVE_PID=""
+}
+
+cleanup() {
+  [ -z "$SERVE_PID" ] || stop_serve
 }
 trap cleanup EXIT INT TERM
 
@@ -210,23 +225,36 @@ echo ""
 step "接口实测"
 
 PORT="${PORT:-}"
-HEALTH_URL="${HEALTH_URL:-}"
+USER_HEALTH_URL="${HEALTH_URL:-}"
+HEALTH_URL="${USER_HEALTH_URL}"
 BAD_URL="${BAD_CASE_URL:-}"
-if [ -z "${HEALTH_URL:-}" ] && [ -n "$PORT" ]; then
+if [ -z "$HEALTH_URL" ] && [ -n "$PORT" ]; then
   HEALTH_URL="http://127.0.0.1:${PORT}${HEALTH_PATH}"
   BAD_URL="http://127.0.0.1:${PORT}${BAD_CASE_PATH}"
 fi
 
 reachable() { curl -fsS --max-time 2 "$1" >/dev/null 2>&1; }
 
-if [ -z "${HEALTH_URL:-}" ]; then
+PROBING=0
+if [ -z "$HEALTH_URL" ]; then
   skip "无端口信息（归属表缺端口列且没给 HEALTH_URL），接口实测跳过"
+elif [ -n "$USER_HEALTH_URL" ]; then
+  warn "实测对象是人工指定的 HEALTH_URL，闸门无法确认它跑的是本分支代码"
+  if ! reachable "$HEALTH_URL"; then
+    fail "指定的 HEALTH_URL 连不上: $HEALTH_URL"
+  fi
+  PROBING=1
+elif [ -z "$PORT" ]; then
+  skip "无端口信息，接口实测跳过"
 elif reachable "$HEALTH_URL"; then
-  warn "服务已在 $HEALTH_URL 上，闸门直接用它实测（不替你起）"
+  # 每个任务的端口是独占的。端口上站着别的服务，闸门无从判断它跑的是哪份代码，
+  # 拿它做实测等于替一个不是本分支的进程背书——所以这是失败，不是警告。
+  fail "端口 $PORT 上已有服务，闸门无法确认它跑的是本分支代码。停掉它再跑；确实要测外部服务就显式设 HEALTH_URL"
 elif [ -z "$SERVE_CMD" ]; then
   skip "服务没起且未配置 SERVE_CMD"
 else
   SERVE_LOG="$(mktemp)"
+  SERVE_PROBE_URL="$HEALTH_URL"
   ( cd "$RUN_DIR" && exec env PORT="$PORT" sh -c "$SERVE_CMD" ) >"$SERVE_LOG" 2>&1 &
   SERVE_PID=$!
   READY=0
@@ -239,20 +267,28 @@ else
     fail "服务没起来（等了 ${WAIT_SECS}s），日志见上"
   fi
   ok "服务已启动 (pid $SERVE_PID, port $PORT)"
+  PROBING=1
 fi
 
-if [ -n "$HEALTH_URL" ] && reachable "$HEALTH_URL"; then
+if [ "$PROBING" = "1" ]; then
   ok "健康检查 $HEALTH_URL"
   if [ -z "$BAD_URL" ]; then
     skip "未给 BAD_CASE_URL，边界用例跳过"
   else
-    CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$BAD_URL" 2>/dev/null || echo 000)"
+    CODE="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$BAD_URL" 2>/dev/null || true)"
+    [ -n "$CODE" ] || CODE=000
     case "$CODE" in
       4*) ok "边界用例 $BAD_URL 返回 $CODE" ;;
       000) fail "边界用例无响应: $BAD_URL" ;;
       *)   fail "边界用例期望 4xx，实际 $CODE" ;;
     esac
   fi
+fi
+
+# 实测一结束立刻收掉自己起的服务：不留僵尸进程污染下一次运行
+if [ -n "$SERVE_PID" ]; then
+  stop_serve
+  ok "测试服务已停，端口 $PORT 已释放"
 fi
 
 # ---------- 7. 回归 ----------

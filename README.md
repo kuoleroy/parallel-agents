@@ -12,7 +12,7 @@
 </p>
 
 <p>
-  <a href="docs/evidence.md"><strong>Verified: 8 violations injected, 8 blocked · compliant branch OK 11 / SKIP 0 / FAIL 0</strong></a>
+  <a href="docs/evidence.md"><strong>Verified: 9 violations injected, 9 blocked · compliant branch OK 12 / SKIP 0 / FAIL 0</strong></a>
 </p>
 
 An agent-agnostic playbook for running several AI coding agents on one project at once: freeze the contract first, schedule by dependency waves, isolate each agent in its own git worktree with a machine-checked file boundary, and merge only through a gate. Follows the [Agent Skills](https://agentskills.io) open standard — no platform feature, no MCP server, no slash command required.
@@ -38,7 +38,7 @@ You have 3 AI windows and one project. Here is the actual outcome:
 [`tests/run-test.sh`](tests/run-test.sh) builds a throwaway repo, creates real tasks in real worktrees, then injects the exact mistakes this method claims to prevent. No AI, no network, no token spend — a few seconds on your machine.
 
 ```
-8 violations injected → 8 blocked; 10 positive assertions passed.
+9 violations injected → 9 blocked; 10 positive assertions passed.
 ```
 
 The most useful one is not a merge conflict. The contract says invalid pagination must return `400`; the agent wrote code that silently falls back to page 1. Boundaries are clean, the build is clean, git reports nothing:
@@ -49,12 +49,21 @@ The most useful one is not a merge conflict. The contract says invalid paginatio
 -- build
   OK    build passed
 -- live HTTP probe
-  OK    server started (pid 2228, port 28263)
-  OK    health http://127.0.0.1:28263/api/health
+  OK    server started (pid 1557, port 21234)
+  OK    health http://127.0.0.1:21234/api/health
   FAIL  boundary case expected 4xx, got 200
 ```
 
 The gate's own words for that last line are `FAIL 边界用例期望 4xx，实际 200` — verdict strings are currently Chinese-only, see [Limits](#limits-stated-plainly).
+
+And the probe refuses to borrow a server it did not start. If something is already listening on the task's port, the gate cannot know that process runs *this* branch, so it stops rather than issue a verdict:
+
+```
+-- live HTTP probe
+  FAIL  port 21234 already has a service; the gate cannot confirm it runs this branch
+```
+
+That guard is not theoretical — it replaced a real bug where the gate silently tested a leftover server and handed "passed" to the wrong build. Both defects were caught by CI on a Linux runner, after the same test had passed for weeks on the author's Windows machine.
 
 And when a task edits inside another live task's boundary, it names the owner:
 

@@ -8,7 +8,8 @@
 #   3. 两个任务边界重叠，建任务时就拒绝
 #   4. 契约写了「非法分页返回 400」而代码静默回落，接口实测拦得住
 #   5. 未提交改动 / 未登记分支，闸门拒绝
-#   6. 合规分支在 REQUIRE_FULL=1 下真跑全绿（node 起服务 + curl 实测 + 契约测试）
+#   6. 端口被外来服务占用，闸门拒绝借用它做实测（CI 的 ubuntu runner 抓出来的真 bug）
+#   7. 合规分支在 REQUIRE_FULL=1 下真跑全绿（node 起服务 + curl 实测 + 契约测试）
 #
 # 用法: bash tests/run-test.sh
 #       VERBOSE=1 bash tests/run-test.sh   # 打印闸门完整输出，README 实录素材
@@ -23,6 +24,7 @@ GATE="$ROOT/scripts/gate.sh"
 VERBOSE="${VERBOSE:-0}"
 
 TMP="$(mktemp -d)"
+FOREIGN_PID=""
 PORT_BASE=$((20000 + (RANDOM % 10000)))
 export GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.com
 export GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.com
@@ -32,7 +34,10 @@ FAILED=0
 INJECTED=0
 BLOCKED=0
 
-cleanup() { rm -rf "$TMP"; }
+cleanup() {
+  [ -z "$FOREIGN_PID" ] || kill "$FOREIGN_PID" >/dev/null 2>&1 || true
+  rm -rf "$TMP"
+}
 trap cleanup EXIT INT TERM
 
 c_g=$'\033[32m'; c_r=$'\033[31m'; c_d=$'\033[2m'; c_0=$'\033[0m'
@@ -176,6 +181,21 @@ check_pass "全绿输出里零 SKIP" "SKIP 0" \
   "cd \"$APP\" && REQUIRE_FULL=1 BUILD_CMD='node --check server.mjs' \
    SERVE_CMD='node server.mjs' TEST_CMD='node src/api/__tests__/search.test.js' \
    \"$GATE\" feature/search"
+
+# 注入六：端口上站着别人的服务 —— 这是 CI 的 ubuntu runner 抓出来的真实事故
+# 闸门原先"发现端口有人就借用"，于是拿上一轮遗留、根本没跑本分支代码的进程做实测，
+# 结论可以是假的。现在占用即失败。
+SEARCH_PORT=$((PORT_BASE + 2))
+( cd "$APP" && exec env PORT="$SEARCH_PORT" node server.mjs >/dev/null 2>&1 ) &
+FOREIGN_PID=$!
+for _ in $(seq 1 40); do
+  curl -fsS --max-time 1 "http://127.0.0.1:$SEARCH_PORT/api/health" >/dev/null 2>&1 && break
+  sleep 0.25
+done
+check_block "端口被外来服务占用，拒绝借用" "已有服务" "$PROBE \"$GATE\" feature/search"
+kill "$FOREIGN_PID" >/dev/null 2>&1 || true
+wait "$FOREIGN_PID" >/dev/null 2>&1 || true
+FOREIGN_PID=""
 
 # ---------------------------------------------------------------- 场景二
 group "场景二：master 仓库（没有 main 分支）"
