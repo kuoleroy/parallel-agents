@@ -108,6 +108,13 @@ make_repo() {
 # ---------------------------------------------------------------- 场景一
 group "场景一：main 仓库，两个任务并行（$PORT_BASE 起端口）"
 
+# 这一条是给 CI 兜底的：Windows 下 Git Bash 把所有文件都当可执行，
+# 本地永远测不出「Linux/macOS 用户 ./scripts/new-task.sh 直接 Permission denied」。
+if [ -d "$ROOT/.git" ]; then
+  check_pass "脚本在 git 里带可执行位" "100755" \
+    "git -C \"$ROOT\" ls-files -s scripts/new-task.sh scripts/gate.sh"
+fi
+
 APP="$TMP/app"
 make_repo "$APP" main
 BASE_SHA="$(git -C "$APP" rev-parse main)"

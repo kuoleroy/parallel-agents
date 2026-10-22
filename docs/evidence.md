@@ -7,7 +7,7 @@
 ## 结论
 
 ```
-违规注入 8 次 → 拦下 8 次；正向断言 9 项。
+违规注入 8 次 → 拦下 8 次；正向断言 10 项。
 全部通过: 8 次违规全部拦下，合规分支真实跑绿（起服务 + curl 实测 + 契约测试）。
 ```
 
@@ -30,7 +30,23 @@
 | 7 | 绕过 `new-task.sh` 自己开分支来收口 | 闸门：`FAIL 分支不在归属表里` |
 | 8 | 构建/实测/测试都没配，想拿"绿色"糊过去 | 闸门：`REQUIRE_FULL=1：有 3 项未验证，不构成完整通过` |
 
-正向断言 9 项：建任务、归属表登记与自动分端口、两个 worktree 独立、合规分支全绿、全绿输出 `SKIP 0`、`master` 仓库（无 `main` 分支）自动探测基线等。
+正向断言 10 项：脚本在 git 里带可执行位、建任务、归属表登记与自动分端口、两个 worktree 独立、合规分支全绿、全绿输出 `SKIP 0`、`master` 仓库（无 `main` 分支）自动探测基线等。
+
+## 这套测试自己漏掉的一个 bug
+
+0.2.0 首推之后，GitHub Actions 三条运行全红。原因：**四个 `.sh` 在 git 里的模式是 `100644`，没有可执行位**。
+
+```
+$ git ls-files -s scripts
+100644 ... scripts/gate.sh
+100644 ... scripts/new-task.sh
+```
+
+在 Windows 上跑 `bash tests/run-test.sh` 一切正常——Git Bash 把所有文件都当可执行。在 Linux 上，测试内部直接 `"$ROOT/scripts/new-task.sh"` 调用就是 `Permission denied`，断言成片失败。而真实用户拿到的体验更糟：`./scripts/new-task.sh 01 data src/db` 在 macOS/Linux 上根本跑不起来。
+
+也就是说：**这套「违规必拦」的测试，自己因为只在一种环境下跑过，把一个平台级的破坏性 bug 放过去了。** 现在多了第 10 条断言专门盯可执行位，CI 的 ubuntu runner 成了这个 bug 的常驻捕手——这正是把测试放到第二种环境上跑的价值，也是本仓库刻意让 CI 覆盖 ubuntu + windows 两个 runner 的理由。
+
+（同一次 CI 里 shellcheck 那条也在红。它从未在作者机器上跑过——本机装不上、网络装不了——所以已经先标成 `continue-on-error`，只报告不阻断。）
 
 ## 实录一：契约未实现，被接口实测抓住
 

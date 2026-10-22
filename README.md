@@ -38,7 +38,7 @@ You have 3 AI windows and one project. Here is the actual outcome:
 [`tests/run-test.sh`](tests/run-test.sh) builds a throwaway repo, creates real tasks in real worktrees, then injects the exact mistakes this method claims to prevent. No AI, no network, no token spend — a few seconds on your machine.
 
 ```
-8 violations injected → 8 blocked; 9 positive assertions passed.
+8 violations injected → 8 blocked; 10 positive assertions passed.
 ```
 
 The most useful one is not a merge conflict. The contract says invalid pagination must return `400`; the agent wrote code that silently falls back to page 1. Boundaries are clean, the build is clean, git reports nothing:

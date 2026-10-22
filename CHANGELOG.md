@@ -23,13 +23,9 @@
 - README 徽章（CI / release / license / Agent Skills）。
 - 发布 tag `v0.2.0`，GitHub 与 Gitee 镜像同步。
 
-### Known limits of this release
-
-- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。
-- `v0.2.0` tag 指向加徽章之前的提交；徽章 job 的那次 CI 运行不在 tag 上，属预期。
-
 ### Fixed
 
+- **四个 `.sh` 在 git 里没有可执行位（模式 `100644`）**：Windows 上本地测不出来（Git Bash 把所有文件都当可执行），Linux / macOS 用户 `./scripts/new-task.sh` 直接 `Permission denied`，CI 首推三条运行因此全红。已用 `git update-index --chmod=+x` 修正，并在 `tests/run-test.sh` 里加了第 10 条断言专门盯它——把「只在一种环境跑过」这个盲区变成常驻检查。
 - **`new-task.sh` 的分支存在性判断逻辑写反**（`A || B || {报错}` 在分支与 worktree 都不存在时反而报"分支已存在"），导致任务几乎无法创建。
 - **`gate.sh` 的"回归"步骤是假的**：只 `echo` 一句提醒，却在 `SKILL.md` 里被宣称已自动化。现在真的核对任务书「不要动」保护区与基线既有文件清单。
 - `gate.sh` 中 `sed 's/^/      ~/ /'` 多一个斜杠，运行时报 `unknown option`。
@@ -43,6 +39,11 @@
 - 文档改英文首屏（`README.md`），中文移至 `README.zh.md`。
 - `SKILL.md` frontmatter 补 `license`，私有字段 `agent_created` 收进 `metadata`，符合 Agent Skills 规范。
 - 安装说明改为跨工具路径表；未验证的 plugin 打包方式明确不写。
+
+### Known limits of this release
+
+- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。
+- `v0.2.0` tag 指向加徽章之前的提交；徽章 job 的那次 CI 运行不在 tag 上，属预期。
 
 ## 0.1.0 — 初始版本
 
