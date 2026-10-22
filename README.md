@@ -138,13 +138,18 @@ Configure the gate for your stack with env vars — `BUILD_CMD`, `TEST_CMD`, `SE
 
 ## Install as a skill
 
-The repo root **is** the skill folder, so it installs anywhere the Agent Skills format is read. `SKILL.md` name matches the folder name, as the spec requires.
+The repo root **is** the skill folder, so it installs anywhere the Agent Skills format is read. `SKILL.md` name matches the folder name, as the spec requires. Copy only the skill payload — leave `.git/` and `.github/` behind; they are repo plumbing, not skill content. `tests/` ships with the skill because `SKILL.md` cites it as the mechanism self-test:
+
+```bash
+mkdir -p ~/.claude/skills/parallel-agents
+cp -r parallel-agents/{SKILL.md,AGENTS.md,LICENSE,scripts,templates,docs,tests} ~/.claude/skills/parallel-agents/
+```
 
 | Agent | Path |
 |---|---|
-| Claude Code | `cp -r parallel-agents ~/.claude/skills/parallel-agents` (project: `.claude/skills/`) |
+| Claude Code | `~/.claude/skills/parallel-agents` (project: `.claude/skills/`) |
 | Cursor | `.cursor/skills/parallel-agents` or `.agents/skills/parallel-agents` |
-| Codex / Gemini CLI / Copilot / others | copy into that agent's skills directory |
+| Codex / Gemini CLI / Copilot / others | copy the same seven entries into that agent's skills directory |
 | Rule-file-only agents | copy [`AGENTS.md`](AGENTS.md) into your project |
 | Nothing to install | hand [`docs/methodology.md`](docs/methodology.md) to an agent and it can follow it |
 
@@ -174,3 +179,5 @@ Install only from `kuoleroy/parallel-agents` on GitHub or `kuoleroy/parallel-age
 ## License
 
 MIT.
+
+> AI生成

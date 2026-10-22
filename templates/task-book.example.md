@@ -5,6 +5,7 @@
 - 波次：2
 - 前置：任务 01（数据层）已合并；契约 v1 已冻结
 - 上游契约：docs/contracts/v1.md @ 3f9a1c2
+- 分配端口：3102（起服务只用这个端口，别抢 3000/5432 这类公共端口）
 
 ## 目标
 
@@ -38,9 +39,9 @@
 
 - [ ] `pnpm test src/api/__tests__/search.test.ts` 全绿
 - [ ] `pnpm build` 退出码 0，无 TS error
-- [ ] `curl -s "localhost:3000/api/items?q=abc" | jq '.total'` 为数字
-- [ ] `curl -s -o /dev/null -w '%{http_code}' "localhost:3000/api/items?page=abc"` → `400`
-- [ ] `curl -s "localhost:3000/api/items?page=abc" | jq -r .code` → `INVALID_QUERY`
+- [ ] `curl -s "localhost:3102/api/items?q=abc" | jq '.total'` 为数字
+- [ ] `curl -s -o /dev/null -w '%{http_code}' "localhost:3102/api/items?page=abc"` → `400`
+- [ ] `curl -s "localhost:3102/api/items?page=abc" | jq -r .code` → `INVALID_QUERY`
 - [ ] 停掉数据库后同端点返回 `500`，body 含 `UPSTREAM_DOWN`
 - [ ] `git diff main -- src/db/` 为空
 
@@ -57,3 +58,5 @@
 - 对契约的实现情况：
 - 遗留隐患：
 - 下游须知：
+
+> AI生成

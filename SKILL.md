@@ -1,6 +1,8 @@
 ---
 name: parallel-agents
-description: Orchestrate multiple AI coding agents on a single project in parallel using git worktrees, frozen API/data contracts, dependency-wave scheduling, and a merge gate. This skill should be used when a project can be split into file-disjoint, independently verifiable modules to be built concurrently by separate agent windows, or when coordinating parallel development to prevent merge conflicts and rework.
+description: Orchestrate multiple AI coding agents on a single project in parallel using git worktrees, frozen API/data contracts, dependency-wave scheduling, and a merge gate. This skill should be used when a project can be split into file-disjoint, independently verifiable modules to be built concurrently by separate agent windows, or when coordinating parallel development to prevent merge conflicts and rework. Also triggers on Chinese cues like 并行开发 / 多智能体 / 多窗口并行 / git worktree / 合并冲突 / 防返工.
+name_cn: 并行智能体编排
+description_cn: 在单个项目上编排多个 AI 编码智能体并行开发：git worktree 隔离、冻结契约、依赖波次排期、合并前闸门。当项目可拆成文件不重叠、可独立验收的模块需多窗口并行推进，或要防止并行开发的合并冲突与返工时使用。
 license: MIT
 metadata:
   agent_created: true
@@ -10,6 +12,10 @@ metadata:
 # Parallel Agents
 
 Run several coding agents on one repository at the same time without merge conflicts, without duplicated work, and without losing track of what is actually done.
+
+## Requirements
+
+bash, git, curl, awk, mktemp — on Windows that means Git Bash; if `bash` resolves to a WSL shim (no distro installed), invoke Git Bash by full path (`C:\Program Files\Git\bin\bash.exe`). The self-test additionally needs node and git ≥ 2.28 (`git init -b`).
 
 ## When to activate
 

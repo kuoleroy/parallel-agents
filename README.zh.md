@@ -142,13 +142,18 @@ mkdir -p docs/contracts     # 照 templates/contract.md 写完，commit 到基�
 
 ## 安装为 Skill
 
-仓库根目录**就是** skill 目录，`SKILL.md` 的 `name` 与目录名一致，符合规范，所以任何读 Agent Skills 的工具都能直接装：
+仓库根目录**就是** skill 目录，`SKILL.md` 的 `name` 与目录名一致，符合规范，所以任何读 Agent Skills 的工具都能直接装。只拷 skill 本体——`.git/`、`.github/` 是仓库基建，不是 skill 内容，留在原地；`tests/` 随 skill 一起拷，因为 `SKILL.md` 把它引作机制自测：
+
+```bash
+mkdir -p ~/.claude/skills/parallel-agents
+cp -r parallel-agents/{SKILL.md,AGENTS.md,LICENSE,scripts,templates,docs,tests} ~/.claude/skills/parallel-agents/
+```
 
 | Agent | 路径 |
 |---|---|
-| Claude Code | `cp -r parallel-agents ~/.claude/skills/parallel-agents`（项目级：`.claude/skills/`） |
+| Claude Code | `~/.claude/skills/parallel-agents`（项目级：`.claude/skills/`） |
 | Cursor | `.cursor/skills/parallel-agents` 或 `.agents/skills/parallel-agents` |
-| Codex / Gemini CLI / Copilot 等 | 复制进该 agent 的 skills 目录 |
+| Codex / Gemini CLI / Copilot 等 | 把同样七项复制进该 agent 的 skills 目录 |
 | 只读规则文件的 agent | 把 [`AGENTS.md`](AGENTS.md) 拷进你的项目 |
 | 什么都不装 | 直接把 [`docs/methodology.md`](docs/methodology.md) 丢给 AI 读，它一样能照做 |
 
@@ -182,3 +187,5 @@ mkdir -p docs/contracts     # 照 templates/contract.md 写完，commit 到基�
 ## License
 
 MIT。
+
+> AI生成
