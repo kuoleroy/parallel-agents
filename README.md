@@ -4,6 +4,13 @@
 
 > 中文：[README.zh.md](README.zh.md) · 简体中文说明
 
+<p align="center">
+  <a href="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml"><img src="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/kuoleroy/parallel-agents/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/release-v0.2.0-blue" alt="release v0.2.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
+  <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-lightgrey" alt="Agent Skills standard"></a>
+</p>
+
 <p>
   <a href="docs/evidence.md"><strong>Verified: 8 violations injected, 8 blocked · compliant branch OK 11 / SKIP 0 / FAIL 0</strong></a>
 </p>

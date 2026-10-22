@@ -19,7 +19,14 @@
 - `tests/run-test.sh` + `tests/fixture/`：端到端机制测试，不调用 AI、不联网。注入 8 次违规全部拦下，合规分支 `OK 11 · SKIP 0 · FAIL 0`。
 - `docs/evidence.md`：实录与局限。
 - `AGENTS.md`：给只读规则文件的 agent 用的浓缩版。
-- `.github/workflows/ci.yml`：Ubuntu + Windows 两个 runner 上跑语法检查、shellcheck、机制测试。
+- `.github/workflows/ci.yml`：Ubuntu + Windows 两个 runner 上跑语法检查与机制测试；shellcheck 另列一个 job。
+- README 徽章（CI / release / license / Agent Skills）。
+- 发布 tag `v0.2.0`，GitHub 与 Gitee 镜像同步。
+
+### Known limits of this release
+
+- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。
+- `v0.2.0` tag 指向加徽章之前的提交；徽章 job 的那次 CI 运行不在 tag 上，属预期。
 
 ### Fixed
 
