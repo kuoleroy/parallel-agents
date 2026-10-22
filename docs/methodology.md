@@ -444,7 +444,7 @@ SERVE_CMD='node server.mjs' \
 | `docs/tasks/ownership.md` | 归属表，`任务 \| 分支 \| worktree \| 波次 \| 端口 \| 独占文件 \| 状态`，脚本读写 |
 | `docs/tasks/frozen.patterns` | 冻结文件通配清单，一行一个 |
 | `docs/evidence.md` | 实测拦截记录与真实输出 |
-| `tests/run-test.sh` | 零 token 端到端复现：往流程里注入 9 种违规，逐条断言被拦下 |
+| `tests/run-test.sh` | 零 token 端到端复现：往流程里注入 10 种违规，逐条断言被拦下 |
 | `AGENTS.md` | 给只认规则文件、不装 skill 的 agent 的精简可执行版 |
 
 诚实的边界：这套脚本验证的是**机制**（违规会被拦下），不是**效果**（多 agent 并行真的更快）。后者要在真实项目上跑对照实验，本仓库没有那个数据，也不假装有过。

@@ -6,12 +6,12 @@
 
 <p align="center">
   <a href="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml"><img src="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/kuoleroy/parallel-agents/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/release-v0.2.0-blue" alt="release v0.2.0"></a>
+  <a href="https://github.com/kuoleroy/parallel-agents/tags"><img src="https://img.shields.io/github/v/tag/kuoleroy/parallel-agents?label=release&color=blue" alt="最新 release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-lightgrey" alt="Agent Skills standard"></a>
 </p>
 
-**[已验证：注入 9 次违规 → 拦下 9 次 · 合规分支 `OK 12 · SKIP 0 · FAIL 0`](docs/evidence.md)**
+**[已验证：注入 10 次违规 → 拦下 10 次 · 合规分支 `OK 12 · SKIP 0 · FAIL 0`](docs/evidence.md)**
 
 > 一套与工具无关的并行 AI 开发方法：主控定契约、排波次、管合并；执行 AI 各占一个 git worktree 与一条**机器校验**的独占文件边界并行推进。遵循 [Agent Skills](https://agentskills.io) 开放规范——不依赖任何平台特性、不需要 MCP server、不需要斜杠命令。
 
@@ -36,7 +36,7 @@
 [`tests/run-test.sh`](tests/run-test.sh) 会自建一个一次性仓库，用真脚本建真任务、开真 worktree，然后**故意注入这套方法声称能拦住的那些错误**：
 
 ```
-违规注入 9 次 → 拦下 9 次；正向断言 10 项。
+违规注入 10 次 → 拦下 10 次；正向断言 11 项。
 ```
 
 **不调用任何 AI，不联网，不花 token**，本机几秒跑完。

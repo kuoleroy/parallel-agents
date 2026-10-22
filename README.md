@@ -6,13 +6,13 @@
 
 <p align="center">
   <a href="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml"><img src="https://github.com/kuoleroy/parallel-agents/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/kuoleroy/parallel-agents/releases/tag/v0.2.0"><img src="https://img.shields.io/badge/release-v0.2.0-blue" alt="release v0.2.0"></a>
+  <a href="https://github.com/kuoleroy/parallel-agents/tags"><img src="https://img.shields.io/github/v/tag/kuoleroy/parallel-agents?label=release&color=blue" alt="latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
   <a href="https://agentskills.io"><img src="https://img.shields.io/badge/Agent_Skills-compatible-lightgrey" alt="Agent Skills standard"></a>
 </p>
 
 <p>
-  <a href="docs/evidence.md"><strong>Verified: 9 violations injected, 9 blocked · compliant branch OK 12 / SKIP 0 / FAIL 0</strong></a>
+  <a href="docs/evidence.md"><strong>Verified: 10 violations injected, 10 blocked · compliant branch OK 12 / SKIP 0 / FAIL 0</strong></a>
 </p>
 
 An agent-agnostic playbook for running several AI coding agents on one project at once: freeze the contract first, schedule by dependency waves, isolate each agent in its own git worktree with a machine-checked file boundary, and merge only through a gate. Follows the [Agent Skills](https://agentskills.io) open standard — no platform feature, no MCP server, no slash command required.
@@ -38,7 +38,7 @@ You have 3 AI windows and one project. Here is the actual outcome:
 [`tests/run-test.sh`](tests/run-test.sh) builds a throwaway repo, creates real tasks in real worktrees, then injects the exact mistakes this method claims to prevent. No AI, no network, no token spend — a few seconds on your machine.
 
 ```
-9 violations injected → 9 blocked; 10 positive assertions passed.
+10 violations injected → 10 blocked; 11 positive assertions passed.
 ```
 
 The most useful one is not a merge conflict. The contract says invalid pagination must return `400`; the agent wrote code that silently falls back to page 1. Boundaries are clean, the build is clean, git reports nothing:

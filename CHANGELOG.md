@@ -2,9 +2,9 @@
 
 遵循 [Keep a Changelog](https://keepachangelog.com/) 与语义化版本。
 
-## Unreleased
+## 0.2.1 — 2026-10-23
 
-`v0.2.0` 首推到 GitHub，Actions 在 ubuntu runner 上三条运行全红。两个都是真 bug，都不是 Windows 上能看出来的。
+`v0.2.0` 首推到 GitHub，Actions 在 ubuntu runner 上三条运行全红。三轮下来一共抓出三个真 bug，**没有一个是 Windows 上能测出来的**：缺可执行位、闸门借用别人的服务做实测、冻结清单的通配被当前目录吃掉。详见 `docs/evidence.md`。
 
 ### Fixed
 
@@ -12,14 +12,14 @@
 - **`kill $SERVE_PID` 在 Linux 上打不到真正监听的那个进程**：第一次修完之后 CI 仍然红——ubuntu 上遗留的服务还是没散场，端口还是被下一轮实测撞见。`SERVE_CMD` 外面套着子 shell 和 `sh -c`，SIGTERM 只发给最外层，监听的可能是孙进程。现在收服时按 `/proc` 把整棵子进程树一起 `TERM`，端口仍不释放就补一轮 `KILL`；两轮之后还占着就**如实报 `FAIL` 并把残留 pid 打出来**，不再默默走人。`/proc` 只有 Linux 有，别的环境走不到树杀，但端口复核照样兜得住——测不出来的环境会报错，不会假装干净。
 - **`new-task.sh` 读冻结清单时没加引号**（`p_file_in_patterns "$f" $(cat 冻结清单)`）：清单里只要写了 `*.lock` 这类通配，shell 会先拿当前目录展开，传进检查的就不是模式而是文件名——冻结判定于是静默失真。改为逐行读进数组再传参，顺带复用同一份数组生成任务书里的冻结小节。shellcheck 的 SC2046 抓出来的。
 - **重构实测分支时带出的两处小 bug**：探活被跳过时健康检查仍会跑（现在用 `PROBING` 标志守住）；`curl` 取状态码时 `|| echo 000` 与前面的输出拼接成 `000000`，导致「无响应」那条分支永远不匹配。
-- 以上两条均由 `tests/run-test.sh` 新增的第 9 条违规注入常驻盯住（测试自己往任务端口上起一个外来服务，断言闸门拒绝）。注入数从 8 → 9，正向断言 10 项不变，合规分支 `OK 11` → `OK 12`（多一条「测试服务已停，端口已释放」）。
+- 以上两条均由 `tests/run-test.sh` 新增的违规注入常驻盯住：注入 9 = 测试自己往任务端口上起一个外来服务，断言闸门拒绝；注入 10 = 冻结清单写 `*.lock` 且当前目录有个 `.lock` 文件，断言建任务仍被拒（旧代码会按当前目录展开，冻结检查静默失效）。注入数 8 → 10，正向断言 10 → 11，合规分支 `OK 11` → `OK 12`（多一条「测试服务已停，端口已释放」）。
 
 ### Changed
 
-- 文档与实录同步到真实数字：`README.md` / `README.zh.md` / `SKILL.md` / `docs/methodology.md` / `docs/evidence.md`。`docs/evidence.md` 新增「这套测试自己放过的两个 bug（由 CI 抓到）」一节与实录四。
+- 文档与实录同步到真实数字：`README.md` / `README.zh.md` / `SKILL.md` / `docs/methodology.md` / `docs/evidence.md`。`docs/evidence.md` 新增「CI 抓出来的三个 bug（都是本机测不出来的）」一节与实录四。
 - `p_matches` 里 `[[ "$f" == $p ]]` 补上 `SC2053` 抑制注释：右边加引号会让通配匹配退化成字面量比较，这里要的就是通配，shellcheck 只是不知道意图。
 - **shellcheck job 摘掉 `continue-on-error`，从「只报告」变成硬门禁**。它第一次跑绿就是在同一轮 CI 里报出了上面那条静默失效的冻结判定 bug——这条 job 不是装饰。
-- **教训进了方法论文档**：机制测试只在一种环境跑过就等于没跑过。CI 覆盖 ubuntu + windows 两个 runner 不是仪式感，它这轮就是唯一抓到这两个 bug 的东西。
+- **教训进了方法论文档**：机制测试只在一种环境跑过就等于没跑过。CI 覆盖 ubuntu + windows 两个 runner 不是仪式感，它这轮就是唯一抓到这三个 bug 的东西（三条失败运行记录后被删掉，所以每个 bug 都补了常驻断言，证据不再依赖日志留存）。
 
 ## 0.2.0 — 2026-10-22
 
@@ -61,7 +61,7 @@
 
 ### Known limits of this release
 
-- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。（已在 Unreleased 里做到：它报出的两条之一就是真 bug，跑绿后已摘掉 `continue-on-error`。）
+- shellcheck 在本机装不上（网络受限），那个 job 从没在作者机器上跑过，因此 CI 里标了 `continue-on-error`——它报告问题但不阻断合入。第一次跑绿之后应删掉这行，让它变成硬门禁。（0.2.1 里做到：它报出的两条之一就是真 bug，跑绿后已摘掉 `continue-on-error`。）
 - `v0.2.0` tag 指向加徽章之前的提交；徽章 job 的那次 CI 运行不在 tag 上，属预期。
 
 ## 0.1.0 — 初始版本

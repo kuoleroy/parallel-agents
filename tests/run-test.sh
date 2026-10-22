@@ -9,7 +9,8 @@
 #   4. 契约写了「非法分页返回 400」而代码静默回落，接口实测拦得住
 #   5. 未提交改动 / 未登记分支，闸门拒绝
 #   6. 端口被外来服务占用，闸门拒绝借用它做实测（CI 的 ubuntu runner 抓出来的真 bug）
-#   7. 合规分支在 REQUIRE_FULL=1 下真跑全绿（node 起服务 + curl 实测 + 契约测试）
+#   7. 冻结清单里的通配按模式匹配，不被当前目录展开吃掉（shellcheck 抓出来的真 bug）
+#   8. 合规分支在 REQUIRE_FULL=1 下真跑全绿（node 起服务 + curl 实测 + 契约测试）
 #
 # 用法: bash tests/run-test.sh
 #       VERBOSE=1 bash tests/run-test.sh   # 打印闸门完整输出，README 实录素材
@@ -196,6 +197,17 @@ check_block "端口被外来服务占用，拒绝借用" "已有服务" "$PROBE 
 kill "$FOREIGN_PID" >/dev/null 2>&1 || true
 wait "$FOREIGN_PID" >/dev/null 2>&1 || true
 FOREIGN_PID=""
+
+# 注入十：冻结清单里的通配必须当模式用，不能被当前目录展开吃掉
+# 这条盯的是 shellcheck SC2046 报出的真 bug：旧代码用没引号的 $(cat 冻结清单) 传参，
+# 当前目录里只要有一个 *.lock 的匹配项，传给冻结检查的就变成那个文件名而不是模式，
+# 冻结判定静默失效且不报错。这里故意先造一个 stale.lock，再让新任务碰 deps/foo.lock。
+printf 'placeholder\n' > "$APP/stale.lock"
+printf '*.lock\n' >> "$APP/docs/tasks/frozen.patterns"
+git -C "$APP" add -A
+git -C "$APP" commit -qm "chore: 冻结 *.lock"
+check_block "冻结通配按模式匹配（SC2046 回归）" "冻结" "$NEWC 04 lock deps/foo.lock"
+check_absent "被拒的通配任务没留下 worktree" "$TMP/wk-lock"
 
 # ---------------------------------------------------------------- 场景二
 group "场景二：master 仓库（没有 main 分支）"

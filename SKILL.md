@@ -4,7 +4,7 @@ description: Orchestrate multiple AI coding agents on a single project in parall
 license: MIT
 metadata:
   agent_created: true
-  version: 0.2.0
+  version: 0.2.1
 ---
 
 # Parallel Agents
@@ -178,7 +178,7 @@ After merging, have every remaining worktree run `git merge <base>` to realign b
 
 ## Verified behavior
 
-`docs/evidence.md` records the mechanism test: 9 injected violations, 9 blocked, and a compliant branch passing `OK 12 · SKIP 0 · FAIL 0` with a real HTTP probe. Reproduce with `bash tests/run-test.sh` — no AI, no network, no token spend. It verifies the gate's mechanism, not the outcome of a real multi-agent project.
+`docs/evidence.md` records the mechanism test: 10 injected violations, 10 blocked, and a compliant branch passing `OK 12 · SKIP 0 · FAIL 0` with a real HTTP probe. Reproduce with `bash tests/run-test.sh` — no AI, no network, no token spend. It verifies the gate's mechanism, not the outcome of a real multi-agent project.
 
 ## Reference files
 
