@@ -188,4 +188,4 @@ cp -r parallel-agents/{SKILL.md,AGENTS.md,LICENSE,scripts,templates,docs,tests} 
 
 MIT。
 
-> AI生成
+

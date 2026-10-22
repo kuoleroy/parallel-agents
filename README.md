@@ -180,4 +180,4 @@ Install only from `kuoleroy/parallel-agents` on GitHub or `kuoleroy/parallel-age
 
 MIT.
 
-> AI生成
+
