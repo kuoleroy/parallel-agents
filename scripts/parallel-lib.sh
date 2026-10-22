@@ -92,7 +92,8 @@ p_matches() {
   esac
   case "$p" in
     *'*'*)
-      # shellcheck disable=SC2254
+      # 右边故意不加引号：这里要的就是通配匹配，"$p" 反而变成字面量比较
+      # shellcheck disable=SC2053,SC2254
       [[ "$f" == $p ]] && return 0
       return 1
       ;;

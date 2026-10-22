@@ -63,7 +63,9 @@ And the probe refuses to borrow a server it did not start. If something is alrea
   FAIL  port 21234 already has a service; the gate cannot confirm it runs this branch
 ```
 
-That guard is not theoretical — it replaced a real bug where the gate silently tested a leftover server and handed "passed" to the wrong build. Both defects were caught by CI on a Linux runner, after the same test had passed for weeks on the author's Windows machine.
+That guard is not theoretical. It replaced a bug where the gate silently probed a leftover server and handed "passed" to the wrong build — and the fix itself needed a second round, because `kill $SERVE_PID` on Linux only reached the wrapper shell, not the grandchild still holding the port.
+
+Three defects shipped that way, all caught by CI on a Linux runner after the same test had passed for weeks on the author's Windows machine: missing git exec bits (`Permission denied` for every macOS/Linux user), the borrowed server, and an unquoted expansion that silently disabled the frozen-file check. [`docs/evidence.md`](docs/evidence.md) documents all three. Running your checks on one machine is how you ship a green test and a broken tool.
 
 And when a task edits inside another live task's boundary, it names the owner:
 

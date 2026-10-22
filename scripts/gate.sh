@@ -54,25 +54,62 @@ RED=$'\033[31m'; GRN=$'\033[32m'; YEL=$'\033[33m'; DIM=$'\033[2m'; RST=$'\033[0m
 N_OK=0; N_FAIL=0; N_SKIP=0
 SERVE_PID=""
 SERVE_LOG=""
+SERVE_KIDS=""
+SERVE_LEFTOVER=""
 
 # 停掉闸门自己起的测试服务，并确认端口真的放开了——
 # 下一轮实测必须面对一个干净的端口，否则会拿旧进程的结果当本分支的结论。
+# 返回值：0 = 端口已释放；1 = 还占着（SERVE_LEFTOVER 里是没散场的 pid）。
+_descendants() {
+  local _p="$1" _c
+  # /proc 的 children 列表只有 Linux 有；Windows/macOS 走不到这里就算了，
+  # 反正下面的端口复核会兜住——测不出的环境至少会如实报错，不假装干净。
+  [ -r "/proc/$_p/task/$_p/children" ] || return 0
+  for _c in $(cat "/proc/$_p/task/$_p/children" 2>/dev/null); do
+    _descendants "$_c"
+    printf '%s\n' "$_c"
+  done
+}
+
+_kill_tree() {
+  local _sig="$1" _root="$2" _p
+  kill "-$_sig" "$_root" >/dev/null 2>&1 || true
+  for _p in $SERVE_KIDS; do
+    kill "-$_sig" "$_p" >/dev/null 2>&1 || true
+  done
+}
+
+port_busy() {
+  [ -n "${SERVE_PROBE_URL:-}" ] || return 1
+  type reachable >/dev/null 2>&1 || return 1
+  reachable "$SERVE_PROBE_URL"
+}
+
 stop_serve() {
   [ -n "$SERVE_PID" ] || return 0
-  kill "$SERVE_PID" >/dev/null 2>&1 || true
-  wait "$SERVE_PID" >/dev/null 2>&1 || true
-  if [ -n "${SERVE_PROBE_URL:-}" ]; then
-    local _i
-    for _i in $(seq 1 40); do
-      reachable "$SERVE_PROBE_URL" || break
+  local _i _mine="$SERVE_PID"
+  SERVE_KIDS="$(_descendants "$_mine")"
+  _kill_tree TERM "$_mine"
+  wait "$_mine" >/dev/null 2>&1 || true
+  SERVE_PID=""
+  if port_busy; then
+    # SIGTERM 没打穿到真正监听的那个进程（serve 命令外面套了层 shell 时很常见），
+    # 连子进程一起补一刀 SIGKILL。
+    _kill_tree KILL "$_mine"
+    for _i in $(seq 1 20); do
+      port_busy || break
       sleep 0.25
     done
   fi
-  SERVE_PID=""
+  port_busy || return 0
+  SERVE_LEFTOVER="$_mine ${SERVE_KIDS//$'\n'/ }"
+  return 1
 }
 
 cleanup() {
-  [ -z "$SERVE_PID" ] || stop_serve
+  [ -z "$SERVE_PID" ] || stop_serve ||
+    printf '%s  WARN  %s闸门起的测试服务没停干净，端口上仍占着: %s（下一个任务会被判端口占用）%s\n' \
+      "$YEL" "$RST" "$SERVE_LEFTOVER" "$RST" >&2
 }
 trap cleanup EXIT INT TERM
 
@@ -285,10 +322,13 @@ if [ "$PROBING" = "1" ]; then
   fi
 fi
 
-# 实测一结束立刻收掉自己起的服务：不留僵尸进程污染下一次运行
+# 实测一结束立刻收掉自己起的服务：不留进程污染下一次运行
 if [ -n "$SERVE_PID" ]; then
-  stop_serve
-  ok "测试服务已停，端口 $PORT 已释放"
+  if stop_serve; then
+    ok "测试服务已停，端口 $PORT 已释放"
+  else
+    fail "测试服务没停掉，端口 $PORT 仍被 pid $SERVE_LEFTOVER 占着——必须收干净，否则下一次实测会拿它当本分支的结论"
+  fi
 fi
 
 # ---------- 7. 回归 ----------

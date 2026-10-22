@@ -116,8 +116,15 @@ if [ -n "$COLLIDERS" ]; then
   exit 1
 fi
 
+FROZEN_PATS=()
+while IFS= read -r _pat; do
+  FROZEN_PATS+=("$_pat")
+done < <(grep -v '^[[:space:]]*#' "$FROZEN" | grep -v '^[[:space:]]*$' || true)
+
 for f in "${FILES[@]}"; do
-  if p_file_in_patterns "$f" $(cat "$FROZEN" | grep -v '^#' | grep -v '^[[:space:]]*$' || true); then
+  # 必须逐条传数组：早先是 $(cat 冻结清单) 直接展开，一旦清单里写了 *.lock 这类
+  # 通配，shell 会先拿当前目录去匹配，传给检查的就不是模式而是文件名了。
+  if [ "${#FROZEN_PATS[@]}" -gt 0 ] && p_file_in_patterns "$f" "${FROZEN_PATS[@]}"; then
     echo "错误: $f 属于冻结文件，只能由主控在 $BASE 上改" >&2
     exit 1
   fi
@@ -133,10 +140,12 @@ done
 git -C "$ROOT" worktree add "$WORKTREE" -b "$BRANCH" "$BASE" >/dev/null
 
 FROZEN_LIST=""
-while read -r pat; do
-  FROZEN_LIST="${FROZEN_LIST}- ${pat}（冻结）
+if [ "${#FROZEN_PATS[@]}" -gt 0 ]; then
+  for _pat in "${FROZEN_PATS[@]}"; do
+    FROZEN_LIST="${FROZEN_LIST}- ${_pat}（冻结）
 "
-done < <(grep -v '^[[:space:]]*#' "$FROZEN" | grep -v '^[[:space:]]*$' || true)
+  done
+fi
 
 FILE_LIST=""
 for f in "${FILES[@]}"; do
